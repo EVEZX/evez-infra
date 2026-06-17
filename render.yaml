@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: evez-provider
+    runtime: python
+    buildCommand: pip install aiohttp aiosqlite
+    startCommand: python gateway.py
+    repo: https://github.com/EVEZX/evez-provider-deploy
+    branch: master
+    plan: free
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: VULTR_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
