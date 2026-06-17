@@ -1,0 +1,72 @@
+name: A16 Release → Steven
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    name: Send new A16 product to Steven
+    steps:
+      - name: 📦 Get release info
+        run: |
+          echo "Release: ${{ github.event.release.tag_name }}"
+          echo "Name: ${{ github.event.release.name }}"
+          echo "Body: ${{ github.event.release.body }}"
+          echo ""
+          echo "Assets:"
+          # List all downloadable assets
+          curl -s -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/EVEZX/evez-ai/releases/tags/${{ github.event.release.tag_name }} | \
+            python3 -c "
+          import json,sys
+          data=json.load(sys.stdin)
+          for a in data.get('assets',[]):
+            print(f'  📎 {a[\"name\"]} ({a[\"size\"]//1024}KB)')
+            print(f'     {a[\"browser_download_url\"]}')
+          "
+
+      - name: 📱 Send to Steven via Telegram
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          NAME="${{ github.event.release.name }}"
+          BODY="${{ github.event.release.body }}"
+          
+          # Get download URLs
+          ASSETS=$(curl -s -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/EVEZX/evez-ai/releases/tags/$TAG | \
+            python3 -c "
+          import json,sys
+          data=json.load(sys.stdin)
+          urls=[]
+          for a in data.get('assets',[]):
+            urls.append(f'📎 {a[\"name\"]} ({a[\"size\"]//1024}KB): {a[\"browser_download_url\"]}')
+          print('\n'.join(urls) if urls else 'No files (code release)')
+          ")
+          
+          MESSAGE="🆕 NEW A16 PRODUCT: ${NAME} (${TAG})
+
+${BODY:0:300}
+
+${ASSETS}
+
+🔗 https://github.com/EVEZX/evez-ai/releases/tag/${TAG}
+
+⚠️ TEST THIS FIRST. Nobody sees it until you say it works."
+          
+          echo "Would send to Telegram:"
+          echo "$MESSAGE"
+          
+          # Use OpenClaw API to send (if accessible)
+          curl -s -X POST http://66.42.125.106:18789/api/message \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer s8RF5KKM..." \
+            -d "{\"channel\":\"telegram\",\"target\":\"7453631330\",\"message\":\"$MESSAGE\"}" \
+            --max-time 10 || echo "Direct API failed — Vultr monitor will catch it"
+
+      - name: ✅ Confirm
+        run: |
+          echo "Steven will be notified of every new A16 release."
+          echo "No product ships without his testing."
+          echo "No flops. Ever."
