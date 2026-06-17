@@ -1,0 +1,25 @@
+name: EVEZ API Proxy
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Chat prompt'
+        required: true
+      model:
+        description: 'Model name'
+        required: false
+        default: 'auto'
+
+jobs:
+  proxy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Call EVEZ Provider
+        run: |
+          RESPONSE=$(curl -s -X POST https://evez-provider-production.up.railway.app/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer evez-dev-key-2026" \
+            -d "{\"model\": \"${{ github.event.inputs.model }}\", \"messages\": [{\"role\": \"user\", \"content\": \"${{ github.event.inputs.prompt }}\"}]}" \
+            --max-time 30)
+          echo "$RESPONSE"
