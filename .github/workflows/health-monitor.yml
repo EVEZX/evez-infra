@@ -1,33 +1,26 @@
-name: EVEZ Cross-Platform Health Monitor
+name: EVEZ Health Monitor
 on:
   schedule:
-    - cron: '*/15 * * * *'  # Every 15 minutes
+    - cron: '*/15 * * * *'
   workflow_dispatch:
-
 jobs:
-  health-check:
+  health:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Check EVEZ Provider (Railway)
+      - name: Check all services
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://evez-provider-production.up.railway.app/health --max-time 10)
-          echo "EVEZ Provider: HTTP $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "⚠️ EVEZ Provider is DOWN!"
-          fi
-      
-      - name: Check Vultr Services
-        run: |
-          SERVICES="9100 9300 9500 9600 9700 9800 9998"
-          for PORT in $SERVICES; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://66.42.125.106:$PORT/health --max-time 5 || echo "000")
-            echo "Vultr port $PORT: HTTP $STATUS"
+          echo "=== Railway ==="
+          curl -s https://evez-provider-production.up.railway.app/health --max-time 10 || echo "RAILWAY DOWN"
+          echo ""
+          echo "=== GitHub Pages ==="
+          for p in "" demo.html api-docs.html status.html; do
+            c=$(curl -s -o /dev/null -w "%{http_code}" "https://evezx.github.io/evez-ai/${p}" --max-time 5)
+            echo "$p → $c"
           done
-      
-      - name: Check GitHub Pages
-        run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://evezx.github.io/evez-ai/ --max-time 10)
-          echo "GitHub Pages: HTTP $STATUS"
+          echo ""
+          echo "=== Vultr ==="
+          for port in 9100 9700 10016; do
+            c=$(curl -s -o /dev/null -w "%{http_code}" "http://66.42.125.106:${port}/health" --max-time 5)
+            echo "port $port → $c"
+          done
