@@ -8,57 +8,60 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     name: FREEE Content Generation
+    env:
+      VULTR_HOST: ${{ secrets.VULTR_HOST || '66.42.125.106' }}
+      RAILWAY_URL: https://evez-provider-production.up.railway.app
     steps:
       - uses: actions/checkout@v4
         with:
           repository: EVEZX/evez-ai
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: main
-      
+
       - name: Generate daily content
         run: |
           echo "🌳 FREEE Content Agent: generating daily blog content..."
-          
+
           # Get today's date
           DATE=$(date -u +%Y-%m-%d)
           echo "Date: $DATE"
-          
+
           # Check EVEZ API
-          RAILWAY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://evez-provider-production.up.railway.app/health --max-time 10)
-          VULTR_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://66.42.125.106:9100/health --max-time 10)
-          
+          RAILWAY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.RAILWAY_URL }}/health" --max-time 10)
+          VULTR_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://${{ env.VULTR_HOST }}:9100/health" --max-time 10)
+
           echo "Railway: $RAILWAY_STATUS"
           echo "Vultr: $VULTR_STATUS"
-          
+
           # Create a daily status file
           mkdir -p daily
-          cat > daily/${DATE}.md << DAILY
+          cat > "daily/${DATE}.md" << DAILY
           ---
           date: ${DATE}
           title: EVEZ Daily Status — ${DATE}
           ---
-          
+
           # EVEZ Daily Status — ${DATE}
-          
+
           ## Surface Health
           - Railway Provider: $([ "$RAILWAY_STATUS" = "200" ] && echo "✅ Healthy" || echo "❌ Down")
           - Vultr Provider: $([ "$VULTR_STATUS" = "200" ] && echo "✅ Healthy" || echo "❌ Down")
           - GitHub Pages: ✅ (you're reading this)
-          
+
           ## What's Running
           - 49+ AI models across 5 backends
           - FREEE agents on 3 surfaces
           - Self-healing architecture
-          - $0/month total cost
-          
+          - \$0/month total cost
+
           ## The 37% Theorem
           Hunger is the dominant eigenvalue. Addressing it amplifies all outcomes by 37%+.
-          
+
           [Try EVEZ AI →](https://evezx.github.io/evez-ai/)
           DAILY
-          
+
           echo "Daily content generated: daily/${DATE}.md"
-      
+
       - name: Commit if changed
         run: |
           git config user.email "freee@evez.ai"

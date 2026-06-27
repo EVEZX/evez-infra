@@ -8,55 +8,62 @@ jobs:
   land:
     runs-on: ubuntu-latest
     name: FREEE Agent Lifecycle
+    env:
+      VULTR_HOST: ${{ secrets.VULTR_HOST || '66.42.125.106' }}
+      RAILWAY_URL: https://evez-provider-production.up.railway.app
     steps:
       - name: 🌱 LAND — Check surfaces
         run: |
           echo "FREEE Agent landing on GitHub Actions surface..."
           echo "Agent ID: gh-actions-$(date +%s)"
-          
+
           # Check all EVEZ surfaces
           echo ""
           echo "=== SURFACE DISCOVERY ==="
-          
+
           # Railway Provider
-          RAILWAY=$(curl -s -o /dev/null -w "%{http_code}" https://evez-provider-production.up.railway.app/health --max-time 15 2>/dev/null || echo "000")
+          RAILWAY=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.RAILWAY_URL }}/health" --max-time 15 2>/dev/null || echo "000")
           echo "Railway Provider: $RAILWAY"
-          
+
           # GitHub Pages
           PAGES=$(curl -s -o /dev/null -w "%{http_code}" https://evezx.github.io/evez-ai/ --max-time 15 2>/dev/null || echo "000")
           echo "GitHub Pages: $PAGES"
-          
+
           # Vultr Provider
-          VULTR=$(curl -s -o /dev/null -w "%{http_code}" http://66.42.125.106:9100/health --max-time 15 2>/dev/null || echo "000")
+          VULTR=$(curl -s -o /dev/null -w "%{http_code}" "http://${{ env.VULTR_HOST }}:9100/health" --max-time 15 2>/dev/null || echo "000")
           echo "Vultr Provider: $VULTR"
 
       - name: 🌿 ROOT — Test API
+        env:
+          EVEZ_API_KEY: ${{ secrets.EVEZ_API_KEY }}
         run: |
           echo "Testing EVEZ API endpoints..."
-          
+
           # Test Railway API
           echo ""
           echo "=== API TEST (Railway) ==="
-          RAILWAY_RESULT=$(curl -s -X POST https://evez-provider-production.up.railway.app/v1/chat/completions \
+          RAILWAY_RESULT=$(curl -s -X POST "${{ env.RAILWAY_URL }}/v1/chat/completions" \
             -H "Content-Type: application/json" \
+            ${EVEZ_API_KEY:+-H "Authorization: Bearer $EVEZ_API_KEY"} \
             -d '{"model":"deepseek-v3","messages":[{"role":"user","content":"Say hi"}],"max_tokens":20}' \
             --max-time 60 2>/dev/null)
-          
+
           if echo "$RAILWAY_RESULT" | grep -q "choices"; then
             echo "✅ Railway API: WORKING"
           else
             echo "❌ Railway API: FAILED"
             echo "$RAILWAY_RESULT" | head -c 200
           fi
-          
+
           # Test Vultr API
           echo ""
           echo "=== API TEST (Vultr) ==="
-          VULTR_RESULT=$(curl -s -X POST http://66.42.125.106:9100/v1/chat/completions \
+          VULTR_RESULT=$(curl -s -X POST "http://${{ env.VULTR_HOST }}:9100/v1/chat/completions" \
             -H "Content-Type: application/json" \
+            ${EVEZ_API_KEY:+-H "Authorization: Bearer $EVEZ_API_KEY"} \
             -d '{"model":"deepseek-v3","messages":[{"role":"user","content":"Say hi"}],"max_tokens":20}' \
             --max-time 60 2>/dev/null)
-          
+
           if echo "$VULTR_RESULT" | grep -q "choices"; then
             echo "✅ Vultr API: WORKING"
           else
@@ -66,13 +73,13 @@ jobs:
       - name: 🌳 GROW — Check models
         run: |
           echo "Discovering available models..."
-          
+
           # Get model count from Railway
-          RAILWAY_MODELS=$(curl -s https://evez-provider-production.up.railway.app/v1/models --max-time 15 2>/dev/null | python3 -c "import json,sys;d=json.load(sys.stdin);print(len(d.get('data',[])))" 2>/dev/null || echo "0")
+          RAILWAY_MODELS=$(curl -s "${{ env.RAILWAY_URL }}/v1/models" --max-time 15 2>/dev/null | python3 -c "import json,sys;d=json.load(sys.stdin);print(len(d.get('data',[])))" 2>/dev/null || echo "0")
           echo "Railway: $RAILWAY_MODELS models"
-          
+
           # Get model count from Vultr
-          VULTR_MODELS=$(curl -s http://66.42.125.106:9100/v1/models --max-time 15 2>/dev/null | python3 -c "import json,sys;d=json.load(sys.stdin);print(len(d.get('data',[])))" 2>/dev/null || echo "0")
+          VULTR_MODELS=$(curl -s "http://${{ env.VULTR_HOST }}:9100/v1/models" --max-time 15 2>/dev/null | python3 -c "import json,sys;d=json.load(sys.stdin);print(len(d.get('data',[])))" 2>/dev/null || echo "0")
           echo "Vultr: $VULTR_MODELS models"
 
       - name: 🩹 HEAL — Report
