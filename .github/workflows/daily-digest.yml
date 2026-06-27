@@ -7,22 +7,25 @@ on:
 jobs:
   digest:
     runs-on: ubuntu-latest
+    env:
+      VULTR_HOST: ${{ secrets.VULTR_HOST || '66.42.125.106' }}
+      RAILWAY_URL: https://evez-provider-production.up.railway.app
     steps:
       - name: Gather stats
         run: |
           # Railway health
-          RAILWAY=$(curl -s https://evez-provider-production.up.railway.app/health --max-time 10 2>/dev/null || echo '{"status":"down"}')
+          RAILWAY=$(curl -s "${{ env.RAILWAY_URL }}/health" --max-time 10 2>/dev/null || echo '{"status":"down"}')
           RAILWAY_MODELS=$(echo "$RAILWAY" | python3 -c "import json,sys;print(json.load(sys.stdin).get('models','?'))" 2>/dev/null || echo "?")
           RAILWAY_BACKENDS=$(echo "$RAILWAY" | python3 -c "import json,sys;print(json.load(sys.stdin).get('backends','?'))" 2>/dev/null || echo "?")
-          
+
           # GitHub Pages
           PAGES=$(curl -s -o /dev/null -w "%{http_code}" https://evezx.github.io/evez-ai/ --max-time 5 2>/dev/null || echo "000")
-          
+
           # Vultr
-          VULTR=$(curl -s -o /dev/null -w "%{http_code}" http://66.42.125.106:9100/health --max-time 5 2>/dev/null || echo "000")
-          
+          VULTR=$(curl -s -o /dev/null -w "%{http_code}" "http://${{ env.VULTR_HOST }}:9100/health" --max-time 5 2>/dev/null || echo "000")
+
           DATE=$(date -u +%Y-%m-%d)
-          
+
           echo "## EVEZ Daily Digest — $DATE" > /tmp/digest.md
           echo "" >> /tmp/digest.md
           echo "| Platform | Status | Details |" >> /tmp/digest.md
@@ -31,8 +34,8 @@ jobs:
           echo "| GitHub Pages | $PAGES | evezx.github.io/evez-ai |" >> /tmp/digest.md
           echo "| Vultr | $VULTR | Port 9100 |" >> /tmp/digest.md
           echo "" >> /tmp/digest.md
-          echo "Cost: **$0/month**" >> /tmp/digest.md
-          
+          echo "Cost: **\$0/month**" >> /tmp/digest.md
+
           cat /tmp/digest.md
 
       - uses: actions/github-script@v7

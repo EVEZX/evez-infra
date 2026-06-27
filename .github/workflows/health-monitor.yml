@@ -3,24 +3,71 @@ on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
+
 jobs:
   health:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      VULTR_HOST: ${{ secrets.VULTR_HOST || '66.42.125.106' }}
+      RAILWAY_URL: https://evez-provider-production.up.railway.app
     steps:
       - name: Check all services
+        id: health-check
         run: |
+          FAIL=0
+
           echo "=== Railway ==="
-          curl -s https://evez-provider-production.up.railway.app/health --max-time 10 || echo "RAILWAY DOWN"
+          RAILWAY_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.RAILWAY_URL }}/health" --max-time 10 || echo "000")
+          if [ "$RAILWAY_CODE" != "200" ]; then
+            echo "❌ Railway DOWN (HTTP $RAILWAY_CODE)"
+            FAIL=1
+          else
+            echo "✅ Railway healthy"
+          fi
+
           echo ""
           echo "=== GitHub Pages ==="
           for p in "" demo.html api-docs.html status.html; do
             c=$(curl -s -o /dev/null -w "%{http_code}" "https://evezx.github.io/evez-ai/${p}" --max-time 5)
             echo "$p → $c"
+            if [ "$c" != "200" ] && [ "$c" != "301" ] && [ "$c" != "302" ]; then
+              echo "⚠️ Pages/$p unexpected status"
+              FAIL=1
+            fi
           done
+
           echo ""
           echo "=== Vultr ==="
           for port in 9100 9700 10016; do
-            c=$(curl -s -o /dev/null -w "%{http_code}" "http://66.42.125.106:${port}/health" --max-time 5)
+            c=$(curl -s -o /dev/null -w "%{http_code}" "http://${{ env.VULTR_HOST }}:${port}/health" --max-time 5 || echo "000")
             echo "port $port → $c"
+            if [ "$c" != "200" ]; then
+              echo "❌ Vultr port $port DOWN (HTTP $c)"
+              FAIL=1
+            fi
           done
+
+          echo ""
+          if [ "$FAIL" -eq 1 ]; then
+            echo "health_status=failing" >> "$GITHUB_OUTPUT"
+            echo "⚠️ One or more services are unhealthy"
+          else
+            echo "health_status=healthy" >> "$GITHUB_OUTPUT"
+            echo "✅ All services healthy"
+          fi
+
+      - name: Alert on failure
+        if: steps.health-check.outputs.health_status == 'failing'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: 'failure',
+              description: 'One or more EVEZ services are unhealthy',
+              context: 'EVEZ Health Monitor'
+            });
+            console.log('Alert sent: services unhealthy');
